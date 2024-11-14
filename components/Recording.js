@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, Button, TextInput, FlatList, TouchableOpacity, StyleSheet } from 'react-native';
 import { Audio } from 'expo-av';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Sharing from 'expo-sharing';
 
 export default function RecordingsScreen({ navigation }) {
   const [recordings, setRecordings] = useState([]);
@@ -20,7 +21,6 @@ export default function RecordingsScreen({ navigation }) {
     fetchEmail();
   }, []);
 
-  
   async function loadRecordings(email) {
     const storedRecordings = await AsyncStorage.getItem(email) || '[]';
     setRecordings(JSON.parse(storedRecordings));
@@ -53,7 +53,6 @@ export default function RecordingsScreen({ navigation }) {
       const updatedRecordings = [...recordings, newRecording];
       setRecordings(updatedRecordings);
 
-      
       await AsyncStorage.setItem(email, JSON.stringify(updatedRecordings));
     } catch (error) {
       console.error('Failed to stop recording:', error);
@@ -69,21 +68,32 @@ export default function RecordingsScreen({ navigation }) {
   }
 
   async function playRecording(recording) {
-    const { sound } = await Audio.Sound.createAsync({ uri: recording.uri });
-    await sound.playAsync();
+    try {
+      const { sound } = await Audio.Sound.createAsync({ uri: recording.uri });
+      await sound.playAsync();
+    } catch (error) {
+      console.error('Playback error:', error);
+    }
   }
 
   async function deleteRecording(id) {
     const updatedRecordings = recordings.filter((rec) => rec.id !== id);
     setRecordings(updatedRecordings);
 
-    // Update the recordings in AsyncStorage under the email
     await AsyncStorage.setItem(email, JSON.stringify(updatedRecordings));
   }
 
   const filteredRecordings = recordings.filter((rec) =>
     rec.date.includes(searchTerm)
   );
+
+  const shareRecording = async (recording) => {
+    if (await Sharing.isAvailableAsync()) {
+      await Sharing.shareAsync(recording.uri);
+    } else {
+      console.log("Sharing is not available on this device");
+    }
+  };
 
   const renderItem = ({ item }) => (
     <View style={styles.recordingItem}>
@@ -94,6 +104,9 @@ export default function RecordingsScreen({ navigation }) {
         </TouchableOpacity>
         <TouchableOpacity style={styles.deleteButton} onPress={() => deleteRecording(item.id)}>
           <Text style={styles.buttonText}>Delete</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.shareButton} onPress={() => shareRecording(item)}>
+          <Text style={styles.buttonText}>Share</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -106,6 +119,14 @@ export default function RecordingsScreen({ navigation }) {
     } catch (error) {
       console.error('Failed to log out:', error);
     }
+  };
+
+  const handleFeedback = () => {
+    navigation.navigate('Feedback');
+  };
+
+  const handlePrivacyPolicy = () => {
+    navigation.navigate('PrivacyPolicy');
   };
 
   return (
@@ -122,12 +143,28 @@ export default function RecordingsScreen({ navigation }) {
       <FlatList
         data={filteredRecordings}
         renderItem={renderItem}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => item.id} 
         style={styles.recordingsList}
       />
-      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-        <Text style={styles.buttonText}>Log Out</Text>
-      </TouchableOpacity>
+      <View style={styles.buttonContainer}>
+        <View>
+          <TouchableOpacity style={styles.profileButton} onPress={() => navigation.navigate('Profile')}>
+            <Text style={styles.buttonText}>Go to Profile</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+            <Text style={styles.buttonText}>Log Out</Text>
+          </TouchableOpacity>
+        </View>
+      
+      <View>
+        <TouchableOpacity style={styles.feedbackButton} onPress={handleFeedback}>
+          <Text style={styles.buttonText}>Feedback</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.privacyPolicyButton} onPress={handlePrivacyPolicy}>
+          <Text style={styles.buttonText}>Privacy Policy</Text>
+        </TouchableOpacity>
+        </View>
+      </View>
     </View>
   );
 }
@@ -189,12 +226,48 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     borderRadius: 5,
   },
+  shareButton: {
+    backgroundColor: '#4285F4',
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+    borderRadius: 5,
+  },
+  buttonContainer: {
+    display: 'flex',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  profileButton: {
+    backgroundColor: '#1a73e8',
+    paddingVertical: 15,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginTop: 20,
+    width: 90,
+  },
   logoutButton: {
     backgroundColor: 'green',
     paddingVertical: 15,
-    borderRadius: 25,
+    borderRadius: 15,
     alignItems: 'center',
     marginTop: 20,
+    width: 80,
+  },
+  feedbackButton: {
+    backgroundColor: '#1a73e8',
+    paddingVertical: 15,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginTop: 20,
+    width: '100%',
+  },
+  privacyPolicyButton: {
+    backgroundColor: '#f1c40f',
+    paddingVertical: 15,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginTop: 10,
+    width: '100%',
   },
   buttonText: {
     color: '#fff',
